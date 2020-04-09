@@ -68,6 +68,12 @@
           "CAPABILITY_AUTO_EXPAND"
         ],
         "StackName": "CreateJiraIssueMacroStack{{automation:EXECUTION_ID}}",
+        "Parameters": [
+          {
+            "ParameterKey": "LambdaRoleArn",
+            "ParameterValue": "{{LambdaAssumeRole}}"
+          }
+        ],
         "TemplateBody": "AWSTemplateFormatVersion: '2010-09-09'\nConditions:\n  LambdaAssumeRoleNotSpecified:\n    Fn::Or:\n    - Fn::Equals:\n      - {Ref: LambdaRoleArn}\n      - ''\n    - Fn::Equals:\n      - {Ref: LambdaRoleArn}\n      - undefined\nParameters:\n  LambdaRoleArn: {Default: '', Description: 'The ARN of the role that allows Lambda\n      created by Automation to perform the action on your behalf\n\n      ', Type: String}\nResources:\n  BasicLambdaRole:\n    Condition: LambdaAssumeRoleNotSpecified\n    Properties:\n      AssumeRolePolicyDocument:\n        Statement:\n        - Action: ['sts:AssumeRole']\n          Effect: Allow\n          Principal:\n            Service: [lambda.amazonaws.com]\n        Version: '2012-10-17'\n    Type: AWS::IAM::Role\n  ParameterParserFunction:\n    Properties:\n      Code:\n        ZipFile:\n          Fn::Join:\n          - '\n\n            '\n          - ['def handler (event, context) :', '  response = { \"requestId\" : event[\"requestId\"],\n              \"status\": \"success\" }', '  response[\"fragment\"] = event[\"params\"][\"ssmParameter\"].lstrip(''/'')',\n            '  return response']\n      FunctionName: ParameterParserFunction\n      Handler: index.handler\n      MemorySize: 128\n      Role:\n        Fn::If:\n        - LambdaAssumeRoleNotSpecified\n        - Fn::GetAtt: [BasicLambdaRole, Arn]\n        - {Ref: LambdaRoleArn}\n      Runtime: python2.7\n      Timeout: 300\n    Type: AWS::Lambda::Function\n  ParameterParserMacro:\n    Properties:\n      Description: Parses leading '/' characters from the SSMParameter parameter\n      FunctionName:\n        Fn::GetAtt: [ParameterParserFunction, Arn]\n      Name: ParameterParserMacro\n    Type: AWS::CloudFormation::Macro\n"
       }
     },
